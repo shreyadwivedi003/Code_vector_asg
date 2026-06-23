@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✨ Shreya's Cute Catalog ✨</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Fredoka', sans-serif;
+        }
+        /* Custom pastel scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #faf5ff; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #fbcfe8; 
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-[linear-gradient(to_bottom,_#fff5f5,_#faf5ff)] text-gray-700 min-h-screen flex flex-col">
+
+    <header class="bg-[#fefcbf]/60 backdrop-blur-md sticky top-0 z-50 shadow-sm border-b-4 border-pink-100 py-4 px-4 transition duration-300">
+        <div class="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="text-center sm:text-left">
+                <h1 class="text-3xl font-bold text-pink-500 tracking-wide drop-shadow-sm flex items-center justify-center sm:justify-start gap-2">
+                </h1>
+                <p class="text-sm text-purple-400 mt-0.5">Paginate 200,000+ products with cursor logic! (~35ms per page!)</p>
+            </div>
+            
+            <div class="flex items-center gap-3 bg-white/80 border-2 border-pink-200 px-4 py-2 rounded-2xl shadow-sm">
+                <label for="categoryFilter" class="text-sm font-semibold text-purple-500 flex items-center gap-1">
+                    🐱 Filter by:
+                </label>
+                <select id="categoryFilter" class="bg-transparent border-none text-pink-600 text-sm font-bold focus:outline-none cursor-pointer">
+                    <option value="All">🌈 All Categories</option>
+                    <option value="Electronics">🔌 Electronics</option>
+                    <option value="Clothing">👗 Clothing</option>
+                    <option value="Home & Kitchen">🍳 Home & Kitchen</option>
+                    <option value="Books">📚 Books</option>
+                    <option value="Sports">🎈 Sports</option>
+                    <option value="Beauty">💄 Beauty</option>
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-6xl w-full mx-auto px-4 py-8">
+        
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8 text-center">
+            <div class="bg-pink-50/80 border-2 border-pink-100 rounded-2xl p-3 shadow-sm">
+                <p class="text-xs text-pink-400 font-bold uppercase tracking-wider">Total Pool</p>
+                <p class="text-xl font-black text-pink-500">200,000 items</p>
+            </div>
+            <div class="bg-purple-50/80 border-2 border-purple-100 rounded-2xl p-3 shadow-sm">
+                <p class="text-xs text-purple-400 font-bold uppercase tracking-wider">Loaded Here</p>
+                <p id="loadedCount" class="text-xl font-black text-purple-500">0 items</p>
+            </div>
+            <div class="col-span-2 sm:col-span-1 bg-[#fefcbf]/40 border-2 border-[#fefcbf] rounded-2xl p-3 shadow-sm">
+                <p class="text-xs text-amber-500 font-bold uppercase tracking-wider">Query Speed</p>
+                <p id="querySpeed" class="text-xl font-black text-amber-600">-- ms</p>
+            </div>
+        </div>
+
+        <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            </div>
+
+        <div id="skeletonLoader" class="hidden grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
+            <div class="bg-white/60 p-5 rounded-3xl border-2 border-dashed border-pink-100 animate-pulse h-44 flex flex-col justify-between">
+                <div class="h-6 bg-pink-100/60 rounded-xl w-1/2"></div>
+                <div class="h-4 bg-purple-100/40 rounded-xl w-3/4"></div>
+                <div class="h-6 bg-amber-100/40 rounded-xl w-1/3"></div>
+            </div>
+        </div>
+
+        <div class="flex justify-center items-center mt-12 mb-8">
+            <button id="loadMoreBtn" class="bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white font-bold text-lg px-8 py-3 rounded-full shadow-md hover:shadow-lg transition duration-300 transform hover:-translate-y-0.5 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none flex items-center gap-2">
+                🌸 Load Next Page 💕
+            </button>
+        </div>
+    </main>
+
+    <script>
+        let currentCursor = null;
+        let selectedCategory = 'All';
+        let itemsCounter = 0;
+        const limit = 12;
+
+        const productGrid = document.getElementById('productGrid');
+        const categoryFilter = document.getElementById('categoryFilter');
+        const loadMoreBtn = document.getElementById('loadMoreBtn');
+        const skeletonLoader = document.getElementById('skeletonLoader');
+        const loadedCount = document.getElementById('loadedCount');
+        const querySpeed = document.getElementById('querySpeed');
+
+        // Color profiles for a mixed candy look
+        const cardThemes = [
+            { bg: 'bg-pink-50/60', border: 'border-pink-200', text: 'text-pink-600', badge: 'bg-pink-200 text-pink-700' },
+            { bg: 'bg-purple-50/60', border: 'border-purple-200', text: 'text-purple-600', badge: 'bg-purple-200 text-purple-700' },
+            { bg: 'bg-[#fefcbf]/40', border: 'border-amber-200', text: 'text-amber-700', badge: 'bg-amber-200 text-amber-800' }
+        ];
+
+        async function fetchProducts(append = false) {
+            showLoading(true);
+            const startTime = performance.now();
+
+            try {
+                let url = `/api/products?limit=${limit}`;
+                if (selectedCategory !== 'All') url += `&category=${selectedCategory}`;
+                if (currentCursor && append) url += `&cursor=${currentCursor}`;
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                const endTime = performance.now();
+                querySpeed.innerText = `${Math.round(endTime - startTime)}ms`;
+
+                if (!append) {
+                    productGrid.innerHTML = ''; 
+                    itemsCounter = 0;
+                }
+
+                if (data.products.length === 0 && !append) {
+                    productGrid.innerHTML = `
+                        <div class="col-span-full text-center py-12 bg-white/60 rounded-3xl border-2 border-dashed border-purple-200">
+                            <p class="text-3xl">😿</p>
+                            <p class="text-purple-400 font-bold mt-2">No cute items found in this section.</p>
+                        </div>`;
+                }
+
+                data.products.forEach((product, idx) => {
+                    itemsCounter++;
+                    // Rotate themes dynamically
+                    const theme = cardThemes[itemsCounter % cardThemes.length];
+                    
+                    const card = document.createElement('div');
+                    card.className = `${theme.bg} ${theme.border} border-2 p-5 rounded-3xl shadow-sm hover:shadow-md hover:-translate-y-1 transition duration-300 flex flex-col justify-between relative overflow-hidden backdrop-blur-sm`;
+                    
+                    card.innerHTML = `
+                        <div>
+                            <div class="flex justify-between items-start gap-2 mb-2">
+                                <span class="inline-block ${theme.badge} text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">${product.category}</span>
+                                <span class="text-xs text-purple-300 font-mono">#${product.id.toString().slice(-4)}</span>
+                            </div>
+                            <h3 class="font-bold text-gray-800 text-lg leading-snug mb-1 hover:text-pink-500 transition">${product.name}</h3>
+                            <p class="text-[11px] text-gray-400 font-medium">🕒 Clocked: ${new Date(product.created_at).toLocaleTimeString()}</p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-gray-200/60 flex justify-between items-center">
+                            <span class="text-2xl font-black ${theme.text}">$${product.price}</span>
+                            <span class="text-base opacity-70">✨</span>
+                        </div>
+                    `;
+                    productGrid.appendChild(card);
+                });
+
+                loadedCount.innerText = `${itemsCounter} items`;
+                currentCursor = data.nextCursor;
+                loadMoreBtn.disabled = !currentCursor;
+
+            } catch (error) {
+                console.error("Error loading products:", error);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function showLoading(isLoading) {
+            if (isLoading) {
+                skeletonLoader.classList.remove('hidden');
+                loadMoreBtn.disabled = true;
+            } else {
+                skeletonLoader.classList.add('hidden');
+            }
+        }
+
+        // Action Handlers
+        categoryFilter.addEventListener('change', (e) => {
+            selectedCategory = e.target.value;
+            currentCursor = null; 
+            fetchProducts(false);
+        });
+
+        loadMoreBtn.addEventListener('click', () => {
+            if (currentCursor) fetchProducts(true);
+        });
+
+        // Initialize Catalog View
+        fetchProducts();
+    </script>
+</body>
+</html>
